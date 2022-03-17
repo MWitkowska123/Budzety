@@ -1,0 +1,93 @@
+---
+title: "Projekt 1 WdAD"
+author: "Maja Witkowska"
+date: "09 01 2022"
+output: html_document
+---
+
+## Analiza wczytanych danych
+```{r include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+```
+
+Aby zanalizować dane najpierw wczytujemy je, wybieramy tylko te które są potrzebne do naszej analizy oraz filtrujemy je tak, żeby wyświetlały się tylko dane dotycząca głowy rodziny.
+```{r echo = F}
+dane <- read.csv(file="budzety2005.csv",head=TRUE)
+dane <- dane %>%
+  filter(hoh == 1, flatsize > 0, buildtype != "other") %>%
+  select(townsize, wojregion,buildtype, flatsize, bills, sex, educ, married) %>%
+  mutate(billsmeter = (bills/flatsize))
+str(dane)
+```
+  
+  Zebrane dane dotyczą analizy budżetów gospodarstw domowych w roku 2015. Wybrane przeze mnie kolumny opisują odpowiednio:
+- wojregion: województwo w którym znajduje się gospodarstwo
+- buildtype: typ budowy domu (wolnostojący, bliźniak, dom wielomieszkaniowy, oraz „other” który został usunięty)
+- flatsize: powierzchnia domu (ze względu na to że w 3 domy miały wpisaną powierzchnię „0”, zostały one usunięte)
+- bills: rachunki
+- sex: płeć badanego
+- married: czy osoba badana jest w związku małżeńskim (1 - tak, 0 -nie)
+W poniższej analizie skupimy się głównie na typie budowy domu.
+
+## Czy typ budownictwa wpływa na wielkość domu
+Pierwsze - uważam że trywialne - zagadnienie które chcę sprawdzić to, jakie powierzchnie mają poszczególne rodzaje domów Za pomocą funkcji **summary** wyświetlamy Kwartyle, średnie, mediany oraz maksymalne i minimalne powierzchni domu w danych kategoriach.
+
+```{r echo = F}
+tapply(dane$flatsize, as.factor(dane$buildtype), summary)
+```
+  
+  Tak jak można by przypuszczać, domy wolnostojące średnio mają największą powierzchnię. Co ciekawe najmniejszy i największy dom wśród badanych jest właśnie takim domem. Zaraz za nim są domy „bliźniaki”, które mają nieznacznie mniejszą powierzchnię. Najmniejsze zaś są mieszkania w domach wielomieszkaniowych. Przeciętna wielkość tych domu to kolejno: 86.12, 85.6 i 48 m2. Warto zaważyć, że 75% domów wolnostojących ma powierzchnię wynoszącą ponad 60 oraz 75% bliźniaków ma 58 metrów kwadratowych, więc są one większe niż 75% mieszkań w domach wielomieszkaniowych.
+
+
+## Czy typ budownictwa wpływa na wysokość rachunków na metr kwadratowy
+
+```{r echo = F}
+tapply(dane$billsmeter, as.factor(dane$buildtype), summary)
+```
+  
+  Można zauważyć, że maksymalne i minimalne wartości są w miarę zbliżone (minimalne są równe 0, a w maksymalnych znaczną różnicę można zauważyć, w których bliźniakach rachunek jest tańszy od pozostałych), mediany i średnie są zbliżone do siebie w domach wolnostojących i bliźniakach, za to w domach wielomieszkaniowych są one znacznie droższe (około 4 zł).
+
+## Jaki typ budownictwa dominuje w danych województwach
+
+```{r echo = F}
+wojbuild1 <- dane %>%
+  select(wojregion, buildtype) %>%
+  group_by(wojregion) %>%
+  count(buildtype)
+
+wojbuild <-spread(wojbuild1, buildtype, n)
+wojbuild
+```
+  
+  Domy wolnostojące przeważają w województwach:
+- Lubelskim
+- Podkarpackie
+- Świętokrzyskim
+W reszcie województw przeważają mieszkania w domach wielomieszkaniowych.
+Bliźniaki nie przeważają w żadnym województwie i jest to najrzadszy typ (poza województwem zachodniopomorskim, gdzie taki typ przeważa nad domami wolnostojącymi).
+```{r echo = FALSE}
+par(mfcol = c(1,3))
+barplot(wojbuild$`free standing`, names = wojbuild$wojregion,horiz = TRUE, las = 2, xlim = c(0, 1000), col = "red")
+barplot(wojbuild$`terrace/twin`, names = wojbuild$wojregion,horiz = TRUE, las = 2, xlim = c(0, 1000), col = "blue",)
+barplot(wojbuild$`multi-flat`, names = wojbuild$wojregion,horiz = TRUE, las = 2, xlim = c(0, 1000), col = "green")
+```
+  
+  Wykresy pokazują liczbę danych typów budowy w poszczególnych województwach. Nie można jednak stwierdzić, że najwięcej budynków wolnostojących jest w województwie mazowieckim, ze względów na różne liczności badanych prób. Pokazują one za to, jaka jest różnica w ilościach danych typów budownictwa.
+  
+## Czy stan cywilny i płeć głowy rodziny ma wpływ na mieszkanie w danym typie domu
+```{r echo = F}
+marriedbuild1 <- dane %>%
+  select(married, sex, buildtype) %>%
+  mutate(marriedsex = paste(married, sex)) %>%
+  select(-c(married, sex)) %>%
+  group_by(marriedsex) %>%
+  count(buildtype)
+
+marriedbuild <-spread(marriedbuild1, buildtype, n)
+marriedbuild
+```
+  
+  Pierwsze co rzuca się w oczy to fakt, że jest mniej kobiet, które są głowami rodziny w małżeństwie niż mężczyzn.
+Najczęściej zamieszkanym typem domu w każdym wariancie jest mieszkanie w domu wielomieszkaniowym. Kiedy głową rodziny jest żonaty mężczyzna, częściej mieszkają oni w domach wolnostojących niż w przypadku gdy jest nią kobieta. W miarę podobnie kształtuje się zaś mieszkanie w bliźniaku. W przypadku osób niebędących w związku małżeńskim. W przypadku singli zależność jest podobna. Można więc zakładać, że to nie status cywilny, a płeć głowy rodziny wpływa na rodzaj domu gospodarstwa.
